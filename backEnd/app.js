@@ -8,13 +8,25 @@ require("dotenv").config();
 const Exercise = mongoose.model('Exercise', { 
     name: String,
     img_url: String,
-    description: String, 
+    description: String,
+    muscle: { type: mongoose.Schema.Types.ObjectId, ref: 'Muscle' } // Referência ao músculo
+
 });
 
-app.get("/exercise", async (req, res) => {
-    const exercise = await Exercise.find()
-    return res.send(exercise);
-})
+// GET exercises by muscle
+app.get("/exercise/:muscle", async (req, res) => {
+    try {
+        const muscleName = req.params.muscle;
+        const exercises = await Exercise.find({}).populate({
+            path: 'muscle',
+            match: { name: muscleName } // Filtrar pelo nome do músculo
+        }).exec();
+        const filteredExercises = exercises.filter(exercise => exercise.muscle !== null);
+        return res.send(filteredExercises);
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+});
   
 app.delete("/exercise/:id", async (req, res) =>{
     const exercise = await Exercise.findByIdAndDelete(req.params.id)
@@ -33,14 +45,26 @@ app.put("/exercise/:id", async(req, res) => {
 })
 
 app.post("/exercise", async (req, res) => {
-    const exercise = new Exercise ({
-        name:req.body.name,
-        img_url: req.body.img_url,
-        description:req.body.description
-    })
-    await exercise.save();
-    return res.send(exercise);
-})
+    try {
+        const { name, img_url, description, muscleId } = req.body;
+        // Verifique se o músculo existe
+        const muscleExists = await Muscle.findById(muscleId);
+        if (!muscleExists) {
+            return res.status(400).send("Músculo não encontrado");
+        }
+        // Crie o novo exercício com a referência ao músculo
+        const exercise = new Exercise ({
+            name,
+            img_url,
+            description,
+            muscle: muscleId // Referenciar o músculo pelo _id
+        });
+        await exercise.save();
+        return res.send(exercise);
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+});
 
 //Muscle Entity
 const Muscle = mongoose.model('Muscle', {
@@ -73,48 +97,6 @@ app.post("/muscle", async (req, res) => {
     await muscle.save();
     return res.send(muscle);
 });
-
-//User Entity
-/*const User = mongoose.model('User', {
-    name: String,
-    email: String,
-    password: String,
-});
-
-app.get("/user", async (req, res) => {
-    const users = await User.find();
-    return res.send(users);
-});
-  
-app.delete("/user/:id", async (req, res) =>{
-    const user = await User.findByIdAndDelete(req.params.id);
-    return res.send(user);
-});
-
-app.put("/user/:id", async(req, res) => {
-    const user = await User.findByIdAndUpdate(req.params.id, {
-        name: req.body.name,
-        email: req.body.email,
-        password: req.body.password,
-    },{
-        new: true
-    });
-    return res.send(user);
-});
-
-app.post("/user", async (req, res) => {
-    const user = new User({
-        name: req.body.name,
-        email: req.body.email,
-        password: req.body.password,
-    });
-    await user.save();
-    return res.send(user);
-});*/
-
-const usuarioRoutes = require("./routers/usuarioRouter")
-
-//app.use("/user", usuarioRoutes)
 
 require("./db")
 
